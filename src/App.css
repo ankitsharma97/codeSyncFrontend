@@ -18,6 +18,10 @@ body, html {
   overflow: hidden;
 }
 
+.left {
+  display: block;
+}
+
 .aside {
   width: 230px;
   background-color: #0e1227;
@@ -29,6 +33,7 @@ body, html {
   position: fixed;
   left: 0;
   top: 0;
+  z-index: 999;
 }
 
 .asideInner {
@@ -108,8 +113,8 @@ body, html {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  margin-left: 230px; 
-  width: calc(100vw - 230px); 
+  margin-left: 70px;
+  width: calc(100vw - 230px);
   background-color: #0d132e;
   font-family: monospace;
   overflow: scroll;
@@ -212,9 +217,42 @@ footer a {
   color: rgb(4, 192, 255);
 }
 
+.showLogo {
+  display: block;
+}
+
+.navbar {
+  width: 70%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  padding-left: 20px;
+  padding-top: 20px;
+  padding-bottom: 40px;
+  padding-right: 20px;
+  position: fixed;
+  top: 0px;
+  left: -70%;
+  transition: left 0.5s ease-in-out;
+  z-index: 999;
+}
+
+.navbar.open {
+  left: 0;
+}
+
+.floating-button {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .mainWrap {
     flex-direction: column;
+  }
+
+  .left {
+    display: none;
   }
 
   .aside {
@@ -224,6 +262,7 @@ footer a {
     justify-content: space-between;
     padding: 10px;
     background-color: #0e1227;
+    display: hidden;
   }
 
   .hamburger {
@@ -249,7 +288,6 @@ footer a {
   }
 
   .editorWrap {
-    margin-top: 70px;
     width: 100%;
     margin-left: 0px;
   }
@@ -260,8 +298,26 @@ footer a {
     margin: 5px;
   }
 
+  .showLogo {
+    display: none;
+  }
+
   .codeMirror {
     padding-top: 0;
   }
-}
 
+  .floating-button {
+    display: block;
+    position: fixed;
+    bottom: 40px;
+    right: 20px;
+    z-index: 999;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    border-radius: 50%;
+  }
+}
