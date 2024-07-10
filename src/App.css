@@ -1,0 +1,267 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.mainWrap {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  font-family: 'Arial', sans-serif;
+  overflow: hidden;
+}
+
+.aside {
+  width: 230px;
+  background-color: #0e1227;
+  color: #fff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+}
+
+.asideInner {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.clientList {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  font-weight: bold;
+}
+
+.clientName {
+  margin-top: 10px;
+}
+
+.btn {
+  padding: 10px;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  background-color: salmon;
+  color: #fff;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+}
+
+.btn:hover {
+  background-color: rgba(37, 107, 131, 0.965);
+}
+
+.logoWrap {
+  border-bottom: 1px solid #fff;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.logoImg {
+  height: 60px;
+}
+
+.leaveBtn, .copyBtn {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.leaveBtn {
+  background-color: #ca0000;
+}
+
+.leaveBtn:hover {
+  background-color: #7f050d;
+}
+
+.copyBtn {
+  background-color: #4caf50;
+}
+
+.copyBtn:hover {
+  background-color: #025d06;
+}
+
+.editorWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin-left: 230px; 
+  width: calc(100vw - 230px); 
+  background-color: #0d132e;
+  font-family: monospace;
+  overflow: scroll;
+}
+
+.codeMirror {
+  height: 100%;
+  font-size: 20px;
+  line-height: 1.6;
+  padding-top: 20px;
+}
+
+.CodeMirror {
+  height: 100% !important;
+}
+
+.homePageWrapper {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background-color: #1e1e2e;
+}
+
+.formWrapper {
+  background-color: #282a36;
+  padding: 20px;
+  border-radius: 10px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.mainLable {
+  margin-bottom: 20px;
+}
+
+.logo {
+  display: block;
+  height: 120px;
+  margin-bottom: 30px;
+}
+
+.inputBox {
+  padding: 10px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-weight: bold;
+  background-color: whitesmoke;
+}
+
+.joinBtn {
+  background-color: rgb(0, 156, 207);
+  width: 100px;
+  margin-left: auto;
+}
+
+.createInfo {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.createNewBtn {
+  color: rgb(0, 156, 207);
+  text-decoration: none;
+}
+
+b {
+  font-size: 25px;
+  transition: all 0.3s ease-in-out;
+}
+
+b:hover {
+  color: rgba(37, 107, 131, 0.965);
+}
+
+footer {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+footer a {
+  color: rgb(0, 156, 207);
+  text-decoration: none;
+}
+
+.heart {
+  color: rgb(4, 192, 255);
+}
+
+@media (max-width: 768px) {
+  .mainWrap {
+    flex-direction: column;
+  }
+
+  .aside {
+    width: 100%;
+    height: 70px;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px;
+    background-color: #0e1227;
+  }
+
+  .hamburger {
+    display: block;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 99999;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .hamburger div {
+    width: 25px;
+    height: 3px;
+    background-color: white;
+    margin: 5px;
+    display: block;
+  }
+
+  .logoWrap {
+    text-align: left;
+  }
+
+  .editorWrap {
+    margin-top: 70px;
+    width: 100%;
+    margin-left: 0px;
+  }
+
+  .btn {
+    font-size: 12px;
+    width: 100px;
+    margin: 5px;
+  }
+
+  .codeMirror {
+    padding-top: 0;
+  }
+}
+
