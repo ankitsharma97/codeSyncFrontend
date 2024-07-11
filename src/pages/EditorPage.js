@@ -6,17 +6,19 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { CiMenuBurger } from "react-icons/ci";
 import { RxCross2 } from "react-icons/rx";
+import useCustomWebSocket from '../ws/Websocket';
+
 
 function EditorPage() {
   const navigate = useNavigate();
 
-  // const BASE_URL = 'http://localhost:8000';
-  const BASE_URL = "https://codesyncbackend.onrender.com";
-  const { groupId } = useParams();
-  const [clients, setClients] = useState([]);
-
   const location = useLocation();
   const { username } = location.state || {};
+  const { groupId } = useParams();
+  const [clients, setClients] = useState([]);
+  const { sendMessage, lastMessage } = useCustomWebSocket(groupId);
+  // const BASE_URL = 'http://localhost:8000';
+  const BASE_URL = "https://codesyncbackend.onrender.com";
 
   const fetchClients = () => {
     fetch(`${BASE_URL}/get/${groupId}`)
@@ -66,6 +68,7 @@ function EditorPage() {
       method: "DELETE",
     }).then((response) => {
       if (response.ok) {
+        sendMessage(JSON.stringify({ type: 'leave', groupId, username }));
         toast.success("Left the room");
         navigate("/");
       } else {

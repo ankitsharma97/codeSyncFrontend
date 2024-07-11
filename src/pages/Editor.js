@@ -1,17 +1,20 @@
 import React, { useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams,useLocation } from 'react-router-dom';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { EditorState } from '@codemirror/state';
 import useCustomWebSocket from '../ws/Websocket';
+import toast from 'react-hot-toast';
 
 function Editor() {
+    const location = useLocation();
     const { groupId } = useParams();
     const editorRef = useRef(null);
     const view = useRef(null);
     const { sendMessage, lastMessage } = useCustomWebSocket(groupId);
-    const isRemoteChange = useRef(false); // Flag to differentiate local and remote changes
+    const isRemoteChange = useRef(false);
+    const username = location.state || {};
 
     useEffect(() => {
         if (!editorRef.current) return;
@@ -45,19 +48,26 @@ function Editor() {
     useEffect(() => {
         if (lastMessage !== null) {
             const message = JSON.parse(lastMessage.data);
-            if (view.current) {
-                const docLength = view.current.state.doc.length;
-                const from = Math.min(message.from, docLength);
-                const to = Math.min(message.to, docLength);
-                isRemoteChange.current = true; // Set the flag to true before applying the changes
-                view.current.dispatch({
-                    changes: {
-                        from: from,
-                        to: to,
-                        insert: message.insert
-                    }
-                });
-                isRemoteChange.current = false; // Reset the flag after applying the changes
+            if (message.type === 'join' || message.type === 'leave') {
+                if(message.type === 'leave' && message.username !== username)
+                    toast.error(`${message.username} has left the room`);
+                else
+                    toast.success(`${message.username} has joined the room`);
+            } else {
+                if (view.current) {
+                    const docLength = view.current.state.doc.length;
+                    const from = Math.min(message.from, docLength);
+                    const to = Math.min(message.to, docLength);
+                    isRemoteChange.current = true;
+                    view.current.dispatch({
+                        changes: {
+                            from,
+                            to,
+                            insert: message.insert
+                        }
+                    });
+                    isRemoteChange.current = false;
+                }
             }
         }
     }, [lastMessage]);

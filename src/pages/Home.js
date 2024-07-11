@@ -1,22 +1,18 @@
-
-
-
-
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { v4 as uuid } from 'uuid';
 import { useNavigate } from 'react-router-dom';
+import useCustomWebSocket from '../ws/Websocket';
 
 function Home() {
     // const BASE_URL = 'http://localhost:8000/';
     const BASE_URL = 'https://codesyncbackend.onrender.com/';
 
     const navigate = useNavigate();
-    const [room, setRoom] = useState('');
+    const [room, setRoom] = useState('newRoom');
     const [username, setUsername] = useState('');
 
-
-
+    const { sendMessage, lastMessage } = useCustomWebSocket(room);
 
     
     const createNewRoom = (e) => {
@@ -44,6 +40,7 @@ function Home() {
         })
         .then(response => {
             if (response.ok) {
+                sendMessage(JSON.stringify({ type: 'join', room, username }));
                 navigate(`/editor/${room}`, {
                     state: { username }
                 });
