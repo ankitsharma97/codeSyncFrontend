@@ -6,6 +6,8 @@ Built with React 18 (Create React App), CodeMirror 6, [Yjs](https://yjs.dev) (`y
 
 ## Run it
 
+Requires **Node 24** (`nvm use` reads `.nvmrc`).
+
 ```bash
 npm install
 npm start                  # http://localhost:3000
