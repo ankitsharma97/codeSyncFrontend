@@ -1,106 +1,105 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { v4 as uuid } from 'uuid';
-import { useNavigate } from 'react-router-dom';
-import useCustomWebSocket from '../ws/Websocket';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { FiZap, FiPlay, FiUsers, FiCode, FiShuffle } from 'react-icons/fi';
+import { ROOM_ID_PATTERN } from '../config';
+
+const FEATURES = [
+    { icon: <FiUsers />, title: 'Live cursors', text: 'See who is where, edit together with no conflicts.' },
+    { icon: <FiPlay />, title: 'Run in the browser', text: 'Execute JavaScript and Python — output is shared.' },
+    { icon: <FiCode />, title: '10+ languages', text: 'Syntax support, plus live HTML preview.' },
+    { icon: <FiZap />, title: 'Rooms that persist', text: 'Come back later and pick up where you left off.' },
+];
+
+const newRoomId = () => uuid().slice(0, 8);
+
+const remembered = () => {
+    try { return localStorage.getItem('cwf:username') || ''; } catch { return ''; }
+};
 
 function Home() {
-    // const BASE_URL = 'http://localhost:8000/';
-    const BASE_URL = 'https://codesyncbackend.onrender.com/';
-
     const navigate = useNavigate();
-    const [room, setRoom] = useState('newRoom');
-    const [username, setUsername] = useState('');
+    const [params] = useSearchParams();
+    const invited = params.get('room');
+    const [room, setRoom] = useState(invited || '');
+    const [username, setUsername] = useState(remembered);
 
-    const { sendMessage, lastMessage } = useCustomWebSocket(room);
-
-    
-    const createNewRoom = (e) => {
+    const join = (e) => {
         e.preventDefault();
-        const id = uuid();
-        setRoom(id);
-        toast.success('New Room Created');
-    };
-
-    const joinRoom = (e) => {
-        e.preventDefault();
-        if (room.trim() === '' || username.trim() === '') {
-            toast.error('Room ID & Username are Required');
+        const id = room.trim() || newRoomId();
+        const name = username.trim();
+        if (!name) {
+            toast.error('Pick a display name first');
             return;
         }
-        fetch(`${BASE_URL}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                group_id: room,
-                user_id : username
-            })
-        })
-        .then(response => {
-            if (response.ok) {
-                sendMessage(JSON.stringify({ type: 'join', room, username }));
-                navigate(`/editor/${room}`, {
-                    state: { username }
-                });
-            } else {
-                toast.error('Failed to join the room');
-            }
-        })
-        .catch(error => {
-            toast.error('An error occurred: ' + error.message);
-        });
-    };
-
-    const handleInput = (e) => {
-        if (e.code === 'Enter') {
-            joinRoom(e);
+        if (!ROOM_ID_PATTERN.test(id)) {
+            toast.error('Room ID can use letters, numbers, - and _ (max 64)');
+            return;
         }
+        try { localStorage.setItem('cwf:username', name); } catch { /* storage unavailable */ }
+        navigate(`/editor/${id}`, { state: { username: name } });
     };
 
     return (
-        <div className='homePageWrapper'>
-            <div className='formWrapper'>
-                <img src='./cwf3.png' alt='logo' className='logo' />
-                <h4 className='mainLable'>Paste Invitation ROOM ID</h4>
-                <div className='inputGroup'>
+        <div className="home">
+            <section className="hero">
+                <img src="/cwf3.png" alt="CodeWithFriend" className="heroLogo" />
+                <h1>Code together,<br /><span>in real time.</span></h1>
+                <p className="lead">A shared editor for pair programming, interviews and teaching. No sign-up — just share a link.</p>
+                <ul className="features">
+                    {FEATURES.map((f) => (
+                        <li key={f.title}>
+                            <span className="featureIcon">{f.icon}</span>
+                            <div><b>{f.title}</b><p>{f.text}</p></div>
+                        </li>
+                    ))}
+                </ul>
+            </section>
+
+            <form className="card" onSubmit={join}>
+                <h2>{invited ? "You've been invited" : 'Start coding'}</h2>
+                <p className="cardSub">
+                    {invited ? <>Enter your name to join room <b>{invited}</b>.</> : 'Create a room or join one with its ID.'}
+                </p>
+
+                <label htmlFor="username">Your name</label>
+                <input
+                    id="username"
+                    className="input"
+                    placeholder="e.g. Ankit"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    maxLength={30}
+                    autoFocus={!window.matchMedia('(pointer: coarse)').matches}
+                    autoComplete="nickname"
+                />
+
+                <label htmlFor="room">Room ID <span className="optional">leave empty to create a new room</span></label>
+                <div className="inputRow">
                     <input
-                        type='text'
-                        id='room'
-                        className='inputBox'
-                        placeholder='ROOM ID'
-                        onChange={(e) => setRoom(e.target.value)}
+                        id="room"
+                        className="input"
+                        placeholder="paste a room ID"
                         value={room}
-                        onKeyUp={handleInput}
+                        onChange={(e) => setRoom(e.target.value)}
+                        spellCheck={false}
                     />
-                    <input
-                        type='text'
-                        className='inputBox'
-                        placeholder='Username'
-                        onChange={(e) => setUsername(e.target.value)}
-                        value={username}
-                        onKeyUp={handleInput}
-                    />
-                    <button
-                        className='btn joinBtn'
-                        onClick={joinRoom}
-                    >Join</button>
-                    <span className='createInfo'>
-                        Don't have an invite? Create a&nbsp;
-                        <a
-                            className='createNewBtn'
-                            onClick={createNewRoom}
-                        ><b>New Room</b></a>
-                    </span>
+                    <button type="button" className="btn ghost" onClick={() => setRoom(newRoomId())} title="Generate a room ID">
+                        <FiShuffle />
+                    </button>
                 </div>
-            </div>
-            <footer>
-                <h4>Built with <span className='heart'> ♥️ </span>By <a href='https://github.com/ankitsharma97'><b>Ankit Sharma</b></a></h4>
+
+                <button type="submit" className="btn primary block">
+                    {room.trim() ? 'Join room' : 'Create room'}
+                </button>
+            </form>
+
+            <footer className="homeFooter">
+                Built by <a href="https://github.com/ankitsharma97" target="_blank" rel="noreferrer">Ankit Sharma</a>
             </footer>
         </div>
     );
 }
 
 export default Home;
-

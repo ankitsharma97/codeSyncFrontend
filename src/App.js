@@ -11,29 +11,18 @@ function App() {
     <div>
 
       <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        containerStyle={{}}
-        containerClassName=""
+        position="top-center"
         toastOptions={{
-          duration: 2000,
+          duration: 2200,
           style: {
-            background: 'rgb(0, 156, 207)',
-            color: '#fff',
+            background: '#21222c',
+            color: '#f8f8f2',
+            border: '1px solid #343746',
+            fontSize: '14px',
           },
-          success: {
-            style: {
-              background: 'rgb(0, 156, 207)',
-              color: '#fff',
-            },
-          },
+          success: { iconTheme: { primary: '#19c6f0', secondary: '#21222c' } },
         }}
-
-        
-      >
-
-      </Toaster>
+      />
     </div>
 
     <BrowserRouter>

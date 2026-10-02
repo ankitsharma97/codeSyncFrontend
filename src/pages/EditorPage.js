@@ -1,183 +1,107 @@
-import React, { useState, useEffect } from "react";
-import Client from "./Client";
-import Editor from "./Editor";
-import { useParams, useLocation } from "react-router-dom";
-import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
-import { CiMenuBurger } from "react-icons/ci";
-import { RxCross2 } from "react-icons/rx";
-import useCustomWebSocket from '../ws/Websocket';
+import React, { useState } from 'react';
+import { useParams, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { FiPlay, FiLink, FiLogOut } from 'react-icons/fi';
+import Editor from './Editor';
+import Avatars from '../components/Avatars';
+import { ConsolePanel, PreviewPanel } from '../components/OutputPanel';
+import useCollab from '../hooks/useCollab';
+import { LANGUAGES, getLanguage } from '../languages';
+import { runCode } from '../runner';
 
+const STALE_RUN_MS = 60000; // a "running" record older than this belongs to a client that vanished
 
 function EditorPage() {
-  const navigate = useNavigate();
-
-  const location = useLocation();
-  const { username } = location.state || {};
   const { groupId } = useParams();
-  const [clients, setClients] = useState([]);
-  const { sendMessage, lastMessage } = useCustomWebSocket(groupId);
-  // const BASE_URL = 'http://localhost:8000';
-  const BASE_URL = "https://codesyncbackend.onrender.com";
+  const { username } = useLocation().state || {};
 
-  const fetchClients = () => {
-    fetch(`${BASE_URL}/get/${groupId}`)
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        }
-        throw response;
-      })
-      .then((data) => {
-        const formattedClients = data.map((user) => ({
-          socketId: user.socket_id,
-          username: user.user_id,
-        }));
-        setClients(formattedClients);
-      })
-      .catch((error) => {
-        console.error("An error occurred: ", error);
-      });
+  // Opened via a shared link: ask for a username first.
+  if (!username) return <Navigate to={`/?room=${groupId}`} replace />;
+  return <Room groupId={groupId} username={username} />;
+}
+
+function Room({ groupId, username }) {
+  const navigate = useNavigate();
+  const { ytext, awareness, users, status, language, setLanguage, run, publishRun } = useCollab(groupId, username);
+  const [localStatus, setLocalStatus] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const lang = getLanguage(language);
+  const busy = run.status === 'running' && Date.now() - run.at < STALE_RUN_MS;
+
+  const handleRun = async () => {
+    if (!ytext || !lang.runnable || busy) return;
+    setCollapsed(false);
+    publishRun({ status: 'running', by: username, lang: language, at: Date.now() });
+    const result = await runCode(language, ytext.toString(), { onStatus: setLocalStatus });
+    setLocalStatus(null);
+    publishRun({ status: 'done', by: username, lang: language, at: Date.now(), ...result });
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, [groupId]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchClients();
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [groupId]);
-
-  const handleCopyRoomId = () => {
-    navigator.clipboard.writeText(groupId).then(
-      () => {
-        toast.success("Room ID copied to clipboard");
-      },
-      (err) => {
-        console.error("Could not copy text: ", err);
-      }
+  const handleInvite = () => {
+    const link = `${window.location.origin}/?room=${groupId}`;
+    navigator.clipboard.writeText(link).then(
+      () => toast.success('Invite link copied'),
+      () => toast.error('Could not copy the link')
     );
   };
 
-  const handleLeaveRoom = () => {
-    fetch(`${BASE_URL}/delete/${groupId}/${username}`, {
-      method: "DELETE",
-    }).then((response) => {
-      if (response.ok) {
-        sendMessage(JSON.stringify({ type: 'leave', groupId, username }));
-        toast.success("Left the room");
-        navigate("/");
-      } else {
-        toast.error("Failed to leave the room");
-      }
-    });
-  };
-
-  const [open, setOpen] = useState(false);
-
-  const handleOpen = () => {
-    setOpen(!open);
-  };
-
   return (
-    <div className="mainWrap">
-      <div className="logoWrap">
-        <img src="/cwf3.png" alt="logo" className="logoImg" />
-      </div>
-      <div className="left">
-        <div className="aside">
-          <div className="showLogo">
-            <div className="logoWrap">
-              <img src="/cwf3.png" alt="logo" className="logoImg" />
-            </div>
-          </div>
-          <div className="asideInner">
-            <h3>Connected</h3>
-            <div className="active">
-              <div id="clist" className="clientList">
-                {clients.map((client) => (
-                  <Client key={client.socketId} username={client.username} />
-                ))}
-              </div>
-            </div>
-          </div>
-          <button className="btn leaveBtn" onClick={handleLeaveRoom}>
-            Leave Room
-          </button>
-          <button className="btn copyBtn" onClick={handleCopyRoomId}>
-            Copy RoomId
-          </button>
+    <div className="room">
+      <header className="topbar">
+        <div className="brand">
+          <img src="/cwf3.png" alt="CodeWithFriend" className="brandLogo" />
         </div>
-      </div>
-      <div className="editorWrap">
-        <Editor />
-      </div>
 
-      <div className="floating-button">
-        <div onClick={handleOpen}>
-          <CiMenuBurger
-            style={{
-              fontSize: "1.5rem",
-              color: "#000",
-              cursor: "pointer",
-            }}
-          />
-        </div>
-      </div>
-      <div className={`navbar ${open ? "open" : ""}`}>
-        <div
-          style={{
-            textAlign: "center",
-          }}
-          className="asideInner"
-        >
-          <div
-            style={{
-              position: "relative",
-            }}
+        <button className="roomChip" onClick={handleInvite} title="Copy invite link">
+          <i className={`dot ${status}`} />
+          <span className="roomId">{groupId}</span>
+          <FiLink />
+        </button>
+
+        <span className="spacer" />
+        <span className="break" />
+
+        <Avatars users={users} me={username} />
+
+        <select className="select" value={language} onChange={(e) => setLanguage(e.target.value)} aria-label="Language">
+          {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+        </select>
+
+        {!lang.preview && (
+          <button
+            className="btn primary"
+            onClick={handleRun}
+            disabled={!lang.runnable || busy}
+            title={lang.runnable ? 'Run (⌘/Ctrl + Enter)' : 'Running supports JavaScript and Python'}
           >
-            <p
-              style={{
-                paddingBottom: "10px",
-                borderBottom: "1px solid #000",
-                fontSize: "1.5rem",
-                fontWeight: "bold",
-              }}
-            >
-              Connected
-            </p>
-            <div style={{ position: "absolute", right: "10px", top: "0px" }}>
-                <RxCross2
-                    style={{
-                    fontSize: "1.5rem",
-                    color: "#000",
-                    cursor: "pointer",
-                    }}
-                    onClick={handleOpen}
-                />
-                </div>
-          </div>
-          <div className="active">
-            <div id="clist" className="clientList">
-              {clients.map((client) => (
-                <Client key={client.socketId} username={client.username} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <button className="btn leaveBtn" onClick={handleLeaveRoom}>
-            Leave Room
+            <FiPlay /> <span className="label">Run</span>
           </button>
-          <button className="btn copyBtn" onClick={handleCopyRoomId}>
-            Copy RoomId
-          </button>
+        )}
+
+        <button className="btn ghost" onClick={() => navigate('/')} aria-label="Leave room">
+          <FiLogOut /> <span className="label">Leave</span>
+        </button>
+      </header>
+
+      <main className="workspace">
+        <div className="editorWrap">
+          {status === 'disconnected' && <div className="banner">Connection lost — reconnecting. Your edits are kept and will sync.</div>}
+          <Editor ytext={ytext} awareness={awareness} language={language} onRun={handleRun} />
         </div>
-      </div>
+
+        {ytext && (lang.preview
+          ? <PreviewPanel ytext={ytext} language={language} collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+          : <ConsolePanel
+              run={run}
+              localStatus={localStatus}
+              canRun={lang.runnable}
+              me={username}
+              collapsed={collapsed}
+              onToggle={() => setCollapsed(!collapsed)}
+              onClear={() => publishRun({})}
+            />)}
+      </main>
     </div>
   );
 }
