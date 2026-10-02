@@ -29,6 +29,7 @@ export default function useCollab(roomId, username) {
         const provider = new WebsocketProvider(WS_URL, roomId, doc);
         const { awareness } = provider;
         const files = doc.getMap('files');
+        const gitfs = doc.getMap('gitfs'); // the repository's .git contents, shared by the room
         const meta = doc.getMap('meta');
         const runMap = doc.getMap('run');
         const color = colorFor(username);
@@ -67,7 +68,7 @@ export default function useCollab(roomId, username) {
         setNodes(readNodes(files));
         onRun();
 
-        setSession({ files, awareness, runMap });
+        setSession({ files, gitfs, awareness, runMap });
         return () => {
             awareness.off('change', onChange);
             provider.destroy();

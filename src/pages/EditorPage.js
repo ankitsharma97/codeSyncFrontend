@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiPlay, FiLink, FiLogOut, FiFilePlus } from 'react-icons/fi';
+import { FiPlay, FiLink, FiLogOut, FiFilePlus, FiHelpCircle } from 'react-icons/fi';
 import Editor from './Editor';
 import Avatars from '../components/Avatars';
 import Explorer from '../components/Explorer';
 import Tabs from '../components/Tabs';
-import { ConsolePanel, PreviewPanel } from '../components/OutputPanel';
+import { ConsoleBody, consoleChrome, Dock, PreviewBody } from '../components/OutputPanel';
+import TerminalPanel from '../components/TerminalPanel';
+import { DocsDialog } from '../components/Docs';
 import useCollab from '../hooks/useCollab';
 import { LANGUAGES, detectLanguage, getLanguage } from '../languages';
 import { importIntoProject } from '../utils/importFiles';
@@ -26,9 +28,13 @@ function EditorPage() {
 
 function Room({ groupId, username }) {
   const navigate = useNavigate();
-  const { files, awareness, users, nodes, ready, status, run, publishRun } = useCollab(groupId, username);
+  const { files, gitfs, awareness, users, nodes, ready, status, run, publishRun } = useCollab(groupId, username);
   const [localStatus, setLocalStatus] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [panel, setPanel] = useState('main'); // 'main' = Output or Preview, or 'terminal'
+  const [terminalOpened, setTerminalOpened] = useState(false);
+  const [dockHeight, setDockHeight] = useState(0);
+  const [docs, setDocs] = useState(null); // section id while the guide is open
   const [openIds, setOpenIds] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(() => window.matchMedia('(min-width: 901px)').matches);
@@ -78,6 +84,16 @@ function Room({ groupId, username }) {
     if (!window.matchMedia('(min-width: 901px)').matches) setExplorerOpen(false);
   };
 
+  const showPanel = (id) => {
+    setPanel(id);
+    if (id === 'terminal') setTerminalOpened(true);
+  };
+
+  const openByPath = (path) => {
+    const id = pathToId.get(path.replace(/^\//, ''));
+    if (id) openFile(id);
+  };
+
   const closeTab = (id) => {
     const index = openIds.indexOf(id);
     const remaining = openIds.filter((t) => t !== id);
@@ -96,6 +112,7 @@ function Room({ groupId, username }) {
   const handleRun = async () => {
     if (!ytext || !lang.runnable || busy) return;
     setCollapsed(false);
+    setPanel('main');
     publishRun({ status: 'running', by: username, lang: language, at: Date.now() });
     const project = {};
     pathToId.forEach((id, path) => { project[path] = files.get(id).get('text').toString(); });
@@ -153,6 +170,10 @@ function Room({ groupId, username }) {
           </button>
         )}
 
+        <button className="btn ghost helpBtn" onClick={() => setDocs('start')} aria-label="Open the guide" title="Guide">
+          <FiHelpCircle />
+        </button>
+
         <button className="btn ghost" onClick={() => navigate('/')} aria-label="Leave room">
           <FiLogOut /> <span className="label">Leave</span>
         </button>
@@ -198,28 +219,48 @@ function Room({ groupId, username }) {
               )}
           </div>
 
-          {ytext && (lang.preview
-            ? <PreviewPanel
-                key={activeId}
-                ytext={ytext}
-                files={files}
-                language={language}
-                entryPath={entryPath}
-                readFile={readFile}
+          {ready && (() => {
+            const showPreview = ytext && lang.preview;
+            const chrome = showPreview || panel === 'terminal' ? {} : consoleChrome({ run, localStatus, me: username, onClear: () => publishRun({}) });
+            return (
+              <Dock
+                tabs={[
+                  { id: 'main', label: showPreview ? (language === 'markdown' ? 'Markdown preview' : 'Live preview') : 'Output' },
+                  { id: 'terminal', label: 'Terminal' },
+                ]}
+                active={panel}
+                onTab={showPanel}
+                meta={panel === 'main' ? chrome.meta : null}
+                actions={panel === 'main' ? chrome.actions : null}
                 collapsed={collapsed}
                 onToggle={() => setCollapsed(!collapsed)}
-              />
-            : <ConsolePanel
-                run={run}
-                localStatus={localStatus}
-                canRun={lang.runnable}
-                me={username}
-                collapsed={collapsed}
-                onToggle={() => setCollapsed(!collapsed)}
-                onClear={() => publishRun({})}
-              />)}
+                tall={panel === 'main' && showPreview}
+                onHeight={setDockHeight}
+              >
+                <div className="dockPane" hidden={panel !== 'main'}>
+                  {showPreview
+                    ? <PreviewBody key={activeId} ytext={ytext} files={files} language={language} entryPath={entryPath} readFile={readFile} />
+                    : <ConsoleBody run={run} canRun={lang.runnable} />}
+                </div>
+                {terminalOpened && (
+                  <div className="dockPane" hidden={panel !== 'terminal'}>
+                    <TerminalPanel
+                      files={files}
+                      gitfs={gitfs}
+                      username={username}
+                      visible={panel === 'terminal' && !collapsed}
+                      height={dockHeight}
+                      onOpenFile={openByPath}
+                      onOpenDocs={setDocs}
+                    />
+                  </div>
+                )}
+              </Dock>
+            );
+          })()}
         </div>
       </main>
+      {docs && <DocsDialog section={docs} onSection={setDocs} onClose={() => setDocs(null)} />}
     </div>
   );
 }

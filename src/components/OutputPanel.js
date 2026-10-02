@@ -1,20 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { FiTerminal, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { renderError, renderMarkdown } from '../utils/markdown';
 import { bundleHtml } from '../utils/bundleHtml';
-import { FiTerminal, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 const MIN = 120;
 
-// Bottom dock with a draggable edge. `title` and `actions` are supplied by the caller.
-function Dock({ title, meta, actions, collapsed, onToggle, tall, children }) {
-    const [height, setHeight] = useState(() => Math.round(window.innerHeight * (tall ? 0.45 : 0.3)));
+/**
+ * Bottom dock with a draggable edge and tabs. Each tab's content stays mounted (the caller hides
+ * the inactive ones), so a terminal session survives switching to Output and back.
+ */
+export function Dock({ tabs, active, onTab, meta, actions, collapsed, onToggle, tall, onHeight, children }) {
+    const [height, setHeight] = useState(() => Math.round(window.innerHeight * 0.38));
     const drag = useRef(null);
+
+    // Reading previews wants more room than watching a console.
+    useEffect(() => {
+        if (tall) setHeight((h) => Math.max(h, Math.round(window.innerHeight * 0.45)));
+    }, [tall]);
+
+    useEffect(() => { onHeight?.(height); }, [height, onHeight]);
 
     useEffect(() => {
         const move = (e) => {
             if (!drag.current) return;
             const next = drag.current.height + (drag.current.y - e.clientY);
-            setHeight(Math.max(MIN, Math.min(next, window.innerHeight * 0.7)));
+            setHeight(Math.max(MIN, Math.min(next, window.innerHeight * 0.75)));
         };
         const stop = () => { drag.current = null; document.body.classList.remove('resizing'); };
         window.addEventListener('pointermove', move);
@@ -31,7 +41,19 @@ function Dock({ title, meta, actions, collapsed, onToggle, tall, children }) {
         <section className="dock" style={collapsed ? undefined : { height }}>
             {!collapsed && <div className="dockHandle" onPointerDown={startDrag} role="separator" aria-orientation="horizontal" />}
             <header className="dockHeader">
-                <span className="dockTitle"><FiTerminal /> {title}</span>
+                <div className="dockTabs" role="tablist">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            role="tab"
+                            aria-selected={tab.id === active}
+                            className={`dockTab ${tab.id === active ? 'active' : ''}`}
+                            onClick={() => { onTab(tab.id); if (collapsed) onToggle(); }}
+                        >
+                            {tab.id === 'terminal' && <FiTerminal />} {tab.label}
+                        </button>
+                    ))}
+                </div>
                 {meta}
                 <span className="spacer" />
                 {actions}
@@ -39,7 +61,7 @@ function Dock({ title, meta, actions, collapsed, onToggle, tall, children }) {
                     {collapsed ? <FiChevronUp /> : <FiChevronDown />}
                 </button>
             </header>
-            {!collapsed && <div className="dockBody">{children}</div>}
+            <div className="dockBody" hidden={collapsed}>{children}</div>
         </section>
     );
 }
@@ -50,10 +72,8 @@ const describe = (run) => {
     return { tone: 'good', text: 'Finished' };
 };
 
-export function ConsolePanel({ run, localStatus, canRun, collapsed, onToggle, onClear, me }) {
-    const body = useRef(null);
-    useEffect(() => { if (body.current) body.current.scrollTop = body.current.scrollHeight; }, [run.at, run.status]);
-
+// Header chips and the clear button for the Output tab.
+export function consoleChrome({ run, localStatus, me, onClear }) {
     const running = run.status === 'running';
     const who = run.by === me ? 'You' : run.by;
     let meta = null;
@@ -63,38 +83,38 @@ export function ConsolePanel({ run, localStatus, canRun, collapsed, onToggle, on
         const d = describe(run);
         meta = <><span className={`chip ${d.tone}`}>{d.text}</span><span className="runMeta">{who} · {run.ms} ms</span></>;
     }
+    const actions = run.status === 'done' && <button className="iconBtn" onClick={onClear} aria-label="Clear output"><FiTrash2 /></button>;
+    return { meta, actions };
+}
+
+export function ConsoleBody({ run, canRun }) {
+    const body = useRef(null);
+    useEffect(() => { if (body.current) body.current.scrollTop = body.current.scrollHeight; }, [run.at, run.status]);
+    const running = run.status === 'running';
 
     return (
-        <Dock
-            title="Output"
-            meta={meta}
-            collapsed={collapsed}
-            onToggle={onToggle}
-            actions={run.status === 'done' && <button className="iconBtn" onClick={onClear} aria-label="Clear output"><FiTrash2 /></button>}
-        >
-            <div className="console" ref={body}>
-                {run.status === 'done' && (
-                    <>
-                        {run.stdout && <pre className="out">{run.stdout}</pre>}
-                        {run.stderr && <pre className="err">{run.stderr}</pre>}
-                        {!run.stdout && !run.stderr && <p className="muted">Program finished with no output.</p>}
-                    </>
-                )}
-                {run.status !== 'done' && !running && (
-                    <div className="emptyState">
-                        {canRun ? (
-                            <><p>Press <kbd>Run</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> to execute.</p><p className="muted">Output is shared with everyone in the room.</p></>
-                        ) : (
-                            <><p>Running is available for <b>JavaScript</b> and <b>Python</b>.</p><p className="muted">Switch the language, or use HTML for a live preview.</p></>
-                        )}
-                    </div>
-                )}
-            </div>
-        </Dock>
+        <div className="console" ref={body}>
+            {run.status === 'done' && (
+                <>
+                    {run.stdout && <pre className="out">{run.stdout}</pre>}
+                    {run.stderr && <pre className="err">{run.stderr}</pre>}
+                    {!run.stdout && !run.stderr && <p className="muted">Program finished with no output.</p>}
+                </>
+            )}
+            {run.status !== 'done' && !running && (
+                <div className="emptyState">
+                    {canRun ? (
+                        <><p>Press <kbd>Run</kbd> or <kbd>⌘</kbd> <kbd>Enter</kbd> to execute.</p><p className="muted">Output is shared with everyone in the room.</p></>
+                    ) : (
+                        <><p>Running is available for <b>JavaScript</b> and <b>Python</b>.</p><p className="muted">Switch the language, or use HTML for a live preview.</p></>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }
 
-export function PreviewPanel({ ytext, files, language, entryPath, readFile, collapsed, onToggle }) {
+export function PreviewBody({ ytext, files, language, entryPath, readFile }) {
     const [doc, setDoc] = useState(null);
     const readRef = useRef(readFile);
     readRef.current = readFile;
@@ -127,10 +147,6 @@ export function PreviewPanel({ ytext, files, language, entryPath, readFile, coll
     // Opaque origin, isolated from the app. Markdown is also sanitized and gets no scripts at all.
     const sandbox = language === 'markdown' ? 'allow-popups allow-popups-to-escape-sandbox' : 'allow-scripts';
 
-    return (
-        <Dock tall title={language === 'markdown' ? 'Markdown preview' : 'Live preview'} collapsed={collapsed} onToggle={onToggle}>
-            {/* Until the first render lands, show the dock's own colour rather than a white flash. */}
-            <iframe className={`preview ${doc == null ? 'pending' : ''}`} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />
-        </Dock>
-    );
+    // Until the first render lands, show the dock's own colour rather than a white flash.
+    return <iframe className={`preview ${doc == null ? 'pending' : ''}`} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />;
 }

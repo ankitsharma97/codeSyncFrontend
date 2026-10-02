@@ -1,6 +1,7 @@
 import React from 'react';
 import Home from './pages/Home';
 import EditorPage from './pages/EditorPage';
+import DocsPage from './pages/DocsPage';
 import { BrowserRouter ,Route,Routes} from 'react-router-dom';
 import './App.css';
 import { Toaster } from 'react-hot-toast';
@@ -29,6 +30,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home/>} />
         <Route path="/editor/:groupId" element={<EditorPage/>} />
+        <Route path="/docs" element={<DocsPage/>} />
+        <Route path="/docs/:section" element={<DocsPage/>} />
       </Routes>
     </BrowserRouter>
 

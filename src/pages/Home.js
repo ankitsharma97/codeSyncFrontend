@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { v4 as uuid } from 'uuid';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FiZap, FiPlay, FiUsers, FiFolder, FiShuffle } from 'react-icons/fi';
 import { ROOM_ID_PATTERN } from '../config';
 
@@ -96,7 +96,7 @@ function Home() {
             </form>
 
             <footer className="homeFooter">
-                Built by <a href="https://github.com/ankitsharma97" target="_blank" rel="noreferrer">Ankit Sharma</a>
+                <Link to="/docs">Guide</Link> · Built by <a href="https://github.com/ankitsharma97" target="_blank" rel="noreferrer">Ankit Sharma</a>
             </footer>
         </div>
     );
