@@ -21,10 +21,27 @@ const STYLE = `
   input[type=checkbox] { margin-right: 6px; }
 `;
 
+const wrap = (body) =>
+    `<!doctype html><meta charset="utf-8"><base target="_blank"><style>${STYLE}</style><body>${body}</body>`;
+
+// Shown instead of a blank frame when rendering fails.
+export const renderError = (message) =>
+    wrap(`<p style="color:#ff6e6e"><b>Couldn't render the preview.</b></p><p style="color:#9096b1">${message}</p>`);
+
+// A lazy chunk can fail to load (flaky network, or a dev server that just rebuilt); try once more.
+const loadRenderer = async () => {
+    try {
+        return await Promise.all([import('marked'), import('dompurify')]);
+    } catch {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        return Promise.all([import('marked'), import('dompurify')]);
+    }
+};
+
 export async function renderMarkdown(source) {
-    const [{ marked }, { default: DOMPurify }] = await Promise.all([import('marked'), import('dompurify')]);
+    const [{ marked }, { default: DOMPurify }] = await loadRenderer();
     const html = DOMPurify.sanitize(marked.parse(source, { gfm: true, breaks: true }), {
         ADD_ATTR: ['target'],
     });
-    return `<!doctype html><meta charset="utf-8"><base target="_blank"><style>${STYLE}</style><body>${html}</body>`;
+    return wrap(html);
 }

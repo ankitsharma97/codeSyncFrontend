@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { renderMarkdown } from '../utils/markdown';
+import { renderError, renderMarkdown } from '../utils/markdown';
+import { bundleHtml } from '../utils/bundleHtml';
 import { FiTerminal, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 const MIN = 120;
@@ -93,30 +94,43 @@ export function ConsolePanel({ run, localStatus, canRun, collapsed, onToggle, on
     );
 }
 
-export function PreviewPanel({ ytext, language, collapsed, onToggle }) {
-    const [doc, setDoc] = useState('');
+export function PreviewPanel({ ytext, files, language, entryPath, readFile, collapsed, onToggle }) {
+    const [doc, setDoc] = useState(null);
+    const readRef = useRef(readFile);
+    readRef.current = readFile;
 
-    // Re-render shortly after the last edit; works for both HTML and Markdown.
+    // Re-render shortly after the last edit to this file or to any file it pulls in.
     useEffect(() => {
         let timer;
         let stale = false;
         const render = async () => {
-            const source = ytext.toString();
-            const next = language === 'markdown' ? await renderMarkdown(source) : source;
+            let next;
+            try {
+                const source = ytext.toString();
+                next = language === 'markdown' ? await renderMarkdown(source) : bundleHtml(source, entryPath, readRef.current);
+            } catch (error) {
+                console.error('Preview failed:', error);
+                next = renderError(error?.message?.includes('chunk') || error?.name === 'ChunkLoadError'
+                    ? 'The renderer failed to load. Reload the page and try again.'
+                    : 'Something in this file could not be rendered.');
+            }
             if (!stale) setDoc(next);
         };
+        setDoc(null);
         const schedule = () => { clearTimeout(timer); timer = setTimeout(render, 350); };
         render();
         ytext.observe(schedule);
-        return () => { stale = true; clearTimeout(timer); ytext.unobserve(schedule); };
-    }, [ytext, language]);
+        files.observeDeep(schedule);
+        return () => { stale = true; clearTimeout(timer); ytext.unobserve(schedule); files.unobserveDeep(schedule); };
+    }, [ytext, files, language, entryPath]);
 
     // Opaque origin, isolated from the app. Markdown is also sanitized and gets no scripts at all.
     const sandbox = language === 'markdown' ? 'allow-popups allow-popups-to-escape-sandbox' : 'allow-scripts';
 
     return (
         <Dock tall title={language === 'markdown' ? 'Markdown preview' : 'Live preview'} collapsed={collapsed} onToggle={onToggle}>
-            <iframe className="preview" title="Preview" sandbox={sandbox} srcDoc={doc} />
+            {/* Until the first render lands, show the dock's own colour rather than a white flash. */}
+            <iframe className={`preview ${doc == null ? 'pending' : ''}`} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />
         </Dock>
     );
 }

@@ -5,27 +5,30 @@ import toast from 'react-hot-toast';
 import { WS_URL } from '../config';
 import { DEFAULT_LANGUAGE } from '../languages';
 import { colorFor } from '../utils/colors';
+import { initProject, readNodes } from '../utils/fs';
 
 const readUsers = (awareness) =>
     [...awareness.getStates()]
         .filter(([, state]) => state.user)
-        .map(([clientId, state]) => ({ clientId, name: state.user.name, color: state.user.color }));
+        .map(([clientId, state]) => ({ clientId, name: state.user.name, color: state.user.color, file: state.file || null }));
 
 /**
- * Joins a room: one Yjs doc synced over a single WebSocket. Besides the code itself, the doc
- * carries the room's language and the latest run output, so both are shared by everyone.
+ * Joins a room: one Yjs doc synced over a single WebSocket. The doc carries the project's
+ * file tree and every file's text, plus the latest run output, so all of it is shared.
  */
 export default function useCollab(roomId, username) {
     const [session, setSession] = useState(null);
     const [status, setStatus] = useState('connecting');
     const [users, setUsers] = useState([]);
-    const [language, setLanguageState] = useState(DEFAULT_LANGUAGE);
+    const [nodes, setNodes] = useState([]);
+    const [ready, setReady] = useState(false);
     const [run, setRunState] = useState({});
 
     useEffect(() => {
         const doc = new Y.Doc();
         const provider = new WebsocketProvider(WS_URL, roomId, doc);
         const { awareness } = provider;
+        const files = doc.getMap('files');
         const meta = doc.getMap('meta');
         const runMap = doc.getMap('run');
         const color = colorFor(username);
@@ -34,7 +37,10 @@ export default function useCollab(roomId, username) {
         // Don't toast for people already in the room while the initial state loads.
         let announce = false;
         provider.on('sync', (synced) => {
-            if (synced) setTimeout(() => { announce = true; }, 1000);
+            if (!synced) return;
+            initProject(doc, files, meta, DEFAULT_LANGUAGE); // only after the server's state has arrived
+            setReady(true);
+            setTimeout(() => { announce = true; }, 1000);
         });
         provider.on('status', ({ status: s }) => setStatus(s));
 
@@ -51,23 +57,27 @@ export default function useCollab(roomId, username) {
         awareness.on('change', onChange);
         setUsers(readUsers(awareness));
 
-        const onMeta = () => setLanguageState(meta.get('language') || DEFAULT_LANGUAGE);
+        // Typing changes file text constantly; only structural changes matter to the tree.
+        const onFiles = (events) => {
+            if (events.some((e) => !(e.target instanceof Y.Text))) setNodes(readNodes(files));
+        };
         const onRun = () => setRunState(runMap.toJSON());
-        meta.observe(onMeta);
+        files.observeDeep(onFiles);
         runMap.observe(onRun);
-        onMeta();
+        setNodes(readNodes(files));
         onRun();
 
-        setSession({ ytext: doc.getText('codemirror'), awareness, meta, runMap });
+        setSession({ files, awareness, runMap });
         return () => {
             awareness.off('change', onChange);
             provider.destroy();
             doc.destroy();
             setSession(null);
+            setReady(false);
+            setNodes([]);
         };
     }, [roomId, username]);
 
-    const setLanguage = useCallback((id) => session?.meta.set('language', id), [session]);
     const publishRun = useCallback((value) => {
         if (!session) return;
         // Replace the whole record so no field from a previous run lingers.
@@ -77,5 +87,5 @@ export default function useCollab(roomId, username) {
         });
     }, [session]);
 
-    return { ...session, status, users, language, setLanguage, run, publishRun };
+    return { ...session, status, users, nodes, ready, run, publishRun };
 }

@@ -14,8 +14,29 @@ const fmt = (v) => {
   if (typeof v === 'string') return v;
   try { return v !== null && typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v); } catch (e) { return String(v); }
 };
+const resolve = (from, rel) => {
+  const parts = rel.startsWith('/') ? [] : from.split('/').slice(0, -1);
+  for (const seg of rel.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') parts.pop(); else parts.push(seg);
+  }
+  return parts.join('/');
+};
 self.onmessage = async ({ data }) => {
   const out = [], err = [];
+  const files = data.files || {};
+  const cache = {};
+  const makeRequire = (from) => (spec) => {
+    if (!spec.startsWith('.') && !spec.startsWith('/')) throw new Error("Cannot find module '" + spec + "' (only relative files can be required)");
+    const base = resolve(from, spec);
+    const found = [base, base + '.js', base + '.json', base + '/index.js'].find((p) => p in files);
+    if (!found) throw new Error("Cannot find module '" + spec + "' from " + from);
+    if (cache[found]) return cache[found].exports;
+    const mod = cache[found] = { exports: {} };
+    if (found.endsWith('.json')) mod.exports = JSON.parse(files[found]);
+    else new Function('module', 'exports', 'require', files[found])(mod, mod.exports, makeRequire(found));
+    return mod.exports;
+  };
   let size = 0;
   const sink = (list) => (...args) => {
     if (size > MAX) return;
@@ -26,7 +47,8 @@ self.onmessage = async ({ data }) => {
   self.console = { log: sink(out), info: sink(out), debug: sink(out), warn: sink(err), error: sink(err) };
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    await new AsyncFunction(data.code)();
+    const entry = { exports: {} };
+    await new AsyncFunction('module', 'exports', 'require', data.code)(entry, entry.exports, makeRequire(data.entry || 'main.js'));
   } catch (e) {
     err.push(e && e.name ? e.name + ': ' + e.message : String(e));
   }
@@ -36,7 +58,9 @@ self.onmessage = async ({ data }) => {
 const PY_WORKER = `
 const MAX = ${MAX_OUTPUT};
 importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+const ROOT = '/home/pyodide';
 let py;
+let written = [];
 self.onmessage = async ({ data }) => {
   const out = [], err = [];
   let size = 0;
@@ -52,9 +76,31 @@ self.onmessage = async ({ data }) => {
       ${BLOCK_NETWORK.replace("'importScripts', ", '')}
     }
     postMessage({ type: 'started' });
+    // Mirror the project into the virtual file system so files can import each other.
+    written.forEach((f) => { try { py.FS.unlink(f); } catch (e) {} });
+    written = [];
+    for (const [path, text] of Object.entries(data.files || {})) {
+      const full = ROOT + '/' + path;
+      py.FS.mkdirTree(full.slice(0, full.lastIndexOf('/')));
+      py.FS.writeFile(full, text);
+      written.push(full);
+    }
+    const entryDir = ROOT + '/' + (data.entry || 'main.py').split('/').slice(0, -1).join('/');
+    py.runPython(
+      'import sys, os, importlib\\n' +
+      'for name, mod in list(sys.modules.items()):\\n' +
+      '    f = getattr(mod, "__file__", None)\\n' +
+      '    if f and f.startswith("' + ROOT + '/"): del sys.modules[name]\\n' +
+      'importlib.invalidate_caches()\\n' +
+      'for p in ["' + entryDir.replace(/\\/$/, '') + '", "' + ROOT + '"]:\\n' +
+      '    if p not in sys.path: sys.path.insert(0, p)\\n' +
+      'os.chdir("' + ROOT + '")'
+    );
     py.setStdout({ batched: sink(out) });
     py.setStderr({ batched: sink(err) });
-    await py.runPythonAsync(data.code, { globals: py.globals.get('dict')() });
+    const globals = py.globals.get('dict')();
+    globals.set('__name__', '__main__');
+    await py.runPythonAsync(data.code, { globals });
   } catch (e) {
     err.push(String(e && e.message ? e.message : e).trim());
   }
@@ -71,10 +117,10 @@ const spawn = (source) => {
 let pythonWorker = null; // kept warm: loading Pyodide takes several seconds
 
 /**
- * Execute code and resolve with { stdout, stderr, ms, timedOut }.
+ * Execute code (the file at `entry`, with the rest of the project in `files`) and resolve with { stdout, stderr, ms, timedOut }.
  * onStatus('loading' | 'running') reports progress for slow first runs.
  */
-export function runCode(language, code, { timeout = 8000, onStatus = () => {} } = {}) {
+export function runCode(language, code, { files = {}, entry, timeout = 8000, onStatus = () => {} } = {}) {
     const isPython = language === 'python';
     const worker = isPython ? (pythonWorker ??= spawn(PY_WORKER)) : spawn(JS_WORKER);
 
@@ -109,6 +155,6 @@ export function runCode(language, code, { timeout = 8000, onStatus = () => {} } 
         };
 
         if (!isPython) arm();
-        worker.postMessage({ code });
+        worker.postMessage({ code, files, entry });
     });
 }

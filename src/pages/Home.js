@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { v4 as uuid } from 'uuid';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FiZap, FiPlay, FiUsers, FiCode, FiShuffle } from 'react-icons/fi';
+import { FiZap, FiPlay, FiUsers, FiFolder, FiShuffle } from 'react-icons/fi';
 import { ROOM_ID_PATTERN } from '../config';
 
 const FEATURES = [
     { icon: <FiUsers />, title: 'Live cursors', text: 'See who is where, edit together with no conflicts.' },
     { icon: <FiPlay />, title: 'Run in the browser', text: 'Execute JavaScript and Python — output is shared.' },
-    { icon: <FiCode />, title: '10+ languages', text: 'Syntax support, plus live HTML preview.' },
+    { icon: <FiFolder />, title: 'Real projects', text: 'Folders and multiple files that import each other.' },
     { icon: <FiZap />, title: 'Rooms that persist', text: 'Come back later and pick up where you left off.' },
 ];
 

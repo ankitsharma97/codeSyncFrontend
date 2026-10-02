@@ -47,6 +47,9 @@ function Editor({ ytext, awareness, language, onRun }) {
         let stale = false;
         getLanguage(language).load().then((extension) => {
             if (!stale && view.current) view.current.dispatch({ effects: languageSlot.current.reconfigure(extension) });
+        }).catch((error) => {
+            // Highlighting is optional; the editor stays usable as plain text if its chunk can't load.
+            console.warn('Could not load syntax support:', error);
         });
         return () => { stale = true; };
     }, [language, ytext]);
