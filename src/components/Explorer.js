@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiChevronRight, FiFilePlus, FiFolderPlus, FiFolder, FiEdit2, FiTrash2, FiUpload } from 'react-icons/fi';
+import { FiChevronRight, FiFilePlus, FiFolderPlus, FiFolder, FiEdit2, FiTrash2, FiUpload, FiDownload } from 'react-icons/fi';
 import { badgeFor, detectLanguage } from '../languages';
 import { buildTree } from '../utils/fs';
 import { collectFromEntries, collectFromInput, describeImport, entriesFromDrop } from '../utils/importFiles';
@@ -46,12 +46,14 @@ function FileBadge({ name }) {
     return <span className="fileBadge" style={{ color }}>{label}</span>;
 }
 
-function Explorer({ nodes, activeId, users, selfClientId, actions, onOpen }) {
+function Explorer({ nodes, activeId, users, selfClientId, actions, onOpen, hasGit, onDownload }) {
     const [collapsed, setCollapsed] = useState(() => new Set());
     const [editing, setEditing] = useState(null); // { mode: 'create', kind, parent } | { mode: 'rename', id }
     const [target, setTarget] = useState(null); // folder that header "new" buttons create into
     const [dropOn, setDropOn] = useState(undefined); // folder id, null for root, undefined for none
     const [uploadMenu, setUploadMenu] = useState(false);
+    const [downloadMenu, setDownloadMenu] = useState(false);
+    const downloadBox = useRef(null);
     const dragging = useRef(null);
     const fileInput = useRef(null);
     const dirInput = useRef(null);
@@ -63,6 +65,13 @@ function Explorer({ nodes, activeId, users, selfClientId, actions, onOpen }) {
         document.addEventListener('mousedown', close);
         return () => document.removeEventListener('mousedown', close);
     }, [uploadMenu]);
+
+    useEffect(() => {
+        if (!downloadMenu) return;
+        const close = (e) => { if (!downloadBox.current?.contains(e.target)) setDownloadMenu(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [downloadMenu]);
 
     const exists = (id) => nodes.some((n) => n.id === id);
     const targetId = target && exists(target) ? target : null;
@@ -221,6 +230,22 @@ function Explorer({ nodes, activeId, users, selfClientId, actions, onOpen }) {
                         <div className="menu">
                             <button onClick={() => fileInput.current.click()}>Upload files…</button>
                             <button onClick={() => dirInput.current.click()}>Upload folder…</button>
+                        </div>
+                    )}
+                </span>
+                <span className="uploadWrap" ref={downloadBox}>
+                    <button
+                        className="iconBtn"
+                        aria-label="Download project as zip"
+                        title="Download as .zip"
+                        onClick={() => (hasGit() ? setDownloadMenu(!downloadMenu) : onDownload(false))}
+                    >
+                        <FiDownload />
+                    </button>
+                    {downloadMenu && (
+                        <div className="menu">
+                            <button onClick={() => { setDownloadMenu(false); onDownload(false); }}>Project files (.zip)</button>
+                            <button onClick={() => { setDownloadMenu(false); onDownload(true); }}>Files + git history (.zip)</button>
                         </div>
                     )}
                 </span>

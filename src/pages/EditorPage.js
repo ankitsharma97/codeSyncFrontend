@@ -11,6 +11,7 @@ import TerminalPanel from '../components/TerminalPanel';
 import { DocsDialog } from '../components/Docs';
 import ChatPanel from '../components/ChatPanel';
 import { sendMessage, userId } from '../utils/chat';
+import { buildZip, saveFile } from '../utils/exportZip';
 import { colorFor } from '../utils/colors';
 import useCollab from '../hooks/useCollab';
 import { LANGUAGES, detectLanguage, getLanguage } from '../languages';
@@ -88,6 +89,21 @@ function Room({ groupId, username }) {
     try { localStorage.setItem('cwf:chat', open ? '1' : '0'); } catch { /* storage unavailable */ }
     if (open && !window.matchMedia('(min-width: 901px)').matches) setExplorerOpen(false);
   };
+
+  const downloadZip = async (includeGit) => {
+    if (!files || !nodes.length) { toast('Nothing to download yet'); return; }
+    try {
+      const { data, fileCount, gitCount } = await buildZip({ files, gitfs, root: groupId, includeGit });
+      saveFile(data, `${groupId}.zip`);
+      toast.success(`Downloaded ${groupId}.zip — ${fileCount} file${fileCount === 1 ? '' : 's'}${gitCount ? ' + git history' : ''}`);
+    } catch (error) {
+      console.error('Zip failed:', error);
+      toast.error('Could not create the zip file');
+    }
+  };
+
+  // Git data isn't React state, so ask at click time rather than at render time.
+  const hasGit = () => (gitfs ? gitfs.size > 0 : false);
 
   const postMessage = (text) => sendMessage(chat, { uid: myUid, user: username, color: colorFor(username), text });
 
@@ -219,6 +235,8 @@ function Room({ groupId, username }) {
             selfClientId={awareness?.clientID}
             actions={actions}
             onOpen={openFile}
+            hasGit={hasGit}
+            onDownload={downloadZip}
           />
         </aside>
 
@@ -282,6 +300,7 @@ function Room({ groupId, username }) {
                       height={dockHeight}
                       onOpenFile={openByPath}
                       onOpenDocs={setDocs}
+                      onDownload={downloadZip}
                     />
                   </div>
                 )}

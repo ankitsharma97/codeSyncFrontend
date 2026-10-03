@@ -15,7 +15,7 @@ const THEME = {
 };
 
 // The screen is private to each person; the files and git history it works on are shared.
-function TerminalPanel({ files, gitfs, username, visible, onOpenFile, onOpenDocs, height }) {
+function TerminalPanel({ files, gitfs, username, visible, onOpenFile, onOpenDocs, onDownload, height }) {
     const host = useRef(null);
     const fitRef = useRef(null);
     const termRef = useRef(null);
@@ -23,6 +23,8 @@ function TerminalPanel({ files, gitfs, username, visible, onOpenFile, onOpenDocs
     openRef.current = onOpenFile;
     const docsRef = useRef(onOpenDocs);
     docsRef.current = onOpenDocs;
+    const downloadRef = useRef(onDownload);
+    downloadRef.current = onDownload;
     const fs = useMemo(() => new ProjectFs(files, gitfs), [files, gitfs]);
 
     useEffect(() => {
@@ -50,7 +52,7 @@ function TerminalPanel({ files, gitfs, username, visible, onOpenFile, onOpenDocs
             const shell = createShell({
                 fs,
                 user: username,
-                hooks: { openFile: (path) => openRef.current?.(path), openDocs: (section) => docsRef.current?.(section) },
+                hooks: { openFile: (path) => openRef.current?.(path), openDocs: (section) => docsRef.current?.(section), download: (withGit) => downloadRef.current?.(withGit) },
             });
             term.write(`${c.bold('CodeWithFriend terminal')}  ${c.dim('— type')} help ${c.dim('for commands,')} git help ${c.dim('for git, or')} docs ${c.dim('for the guide')}\r\n`);
             term.write(`${c.dim('Files and git history are shared with this room; this screen is just yours.')}\r\n\r\n`);

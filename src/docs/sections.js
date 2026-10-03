@@ -16,6 +16,7 @@ export const SECTIONS = [
                     <li><b>Files and folders</b> — use the Files panel on the left. Create, rename (double-click or F2), delete, drag to move, or drop files and whole folders from your computer to import them.</li>
                     <li><b>Run code</b> — pick JavaScript or Python and press <K>Run</K> (or <K>⌘</K>/<K>Ctrl</K> + <K>Enter</K>). The output is shared with the room.</li>
                     <li><b>Preview</b> — HTML and Markdown files get a live preview. HTML files pull in the <C>.css</C> and <C>.js</C> files they reference.</li>
+                    <li><b>Download</b> — the download icon at the top of the Files panel (or <C>download</C> in the terminal) saves the whole project as a <C>.zip</C>, folders and all. If the room has a git repository you can also include its history, and the unzipped folder is a normal git repository you can open with your own git.</li>
                     <li><b>Chat</b> — the speech-bubble button in the top bar opens a chat panel on the right. <K>Enter</K> sends, <K>Shift</K>+<K>Enter</K> adds a new line, and you can share code with triple backticks (<C>```</C>) or <C>`inline code`</C>. A red badge counts messages you haven’t read yet.</li>
                     <li><b>Terminal</b> — the <K>Terminal</K> tab at the bottom is a shell for your project, with git. See the next sections.</li>
                 </ul>
@@ -54,6 +55,7 @@ hi`}</Shell>
                         [<C>open &lt;file&gt;</C>, 'Open a file in the editor'],
                         [<C>python, node</C>, 'Run a file, or inline code with -c / -e'],
                         [<C>git …</C>, 'Version control — see the next section'],
+                        [<C>download [--git]</C>, 'Save the project as a .zip (add --git to include the history)'],
                         [<C>docs, help, clear</C>, 'Open this guide, list commands, clear the screen'],
                     ]}
                 />

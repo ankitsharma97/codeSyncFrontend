@@ -67,13 +67,14 @@ export function parse(tokens) {
 }
 
 // ---- the shell ------------------------------------------------------------------------------
-const COMMAND_NAMES = ['cat', 'cd', 'clear', 'cp', 'date', 'docs', 'echo', 'git', 'grep', 'head', 'help', 'ls', 'mkdir', 'mv', 'node', 'open', 'pwd', 'python', 'python3', 'rm', 'sort', 'tail', 'touch', 'tree', 'uniq', 'wc', 'whoami'];
+const COMMAND_NAMES = ['cat', 'cd', 'clear', 'cp', 'date', 'docs', 'download', 'echo', 'git', 'grep', 'head', 'help', 'ls', 'mkdir', 'mv', 'node', 'open', 'pwd', 'python', 'python3', 'rm', 'sort', 'tail', 'touch', 'tree', 'uniq', 'wc', 'whoami'];
 const GIT_NAMES = ['add', 'auth', 'branch', 'checkout', 'clone', 'commit', 'config', 'diff', 'fetch', 'help', 'init', 'log', 'merge', 'mv', 'pull', 'push', 'remote', 'reset', 'restore', 'rm', 'show', 'status', 'switch', 'tag'];
 
 const HELP = `Shell commands:
   ls [-a] [-l]  cd  pwd  cat  echo  mkdir [-p]  touch  rm [-rf]  mv  cp [-r]  tree
   head  tail  wc  grep [-inv]  sort  uniq  open <file>  clear  date  whoami
   docs [terminal|git|github|run]     open the full guide
+  download [--git]                   save the project as a .zip (--git adds the history)
   python <file> | python -c "code"      node <file> | node -e "code"
   git <command>     (run "git help")
 
@@ -356,6 +357,14 @@ export function createShell({ fs, user, hooks = {} }) {
     cmds.python = script('python', '-c');
     cmds.python3 = cmds.python;
     cmds.node = script('javascript', '-e');
+
+    cmds.download = async (a, ctx) => {
+        const bad = a.find((x) => x !== '--git');
+        if (bad) { ctx.err(`download: unknown option '${bad}'. Usage: download [--git]\n`); return 1; }
+        hooks.download?.(a.includes('--git'));
+        ctx.out(c.dim('Preparing the zip…\n'));
+        return 0;
+    };
 
     cmds.docs = async (a, ctx) => {
         const known = { terminal: 'terminal', git: 'git', github: 'github', run: 'run', help: 'help', start: 'start' };

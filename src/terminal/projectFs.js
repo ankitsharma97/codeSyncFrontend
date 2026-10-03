@@ -25,12 +25,21 @@ export const dirname = (path) => normalize(`${path}/..`);
 export const basename = (path) => path.split('/').filter(Boolean).pop() || '';
 const isGitPath = (path) => path.split('/').includes('.git');
 
+// Git skips re-reading a file when its cached stat (mtime and ctime in WHOLE SECONDS, plus size) matches
+// the index. Project files have no real modification time, and an edit made in the same second as the
+// previous `git add` — to a file of the same length — would look unchanged and be silently skipped.
+// So every stat reports a second value that has never been reported before (a random base plus a
+// counter; the base differs per browser session so stored index entries from earlier sessions can't
+// collide either). The cache then never matches, and git always re-hashes the content.
+const statBase = 1_000_000_000 + Math.floor(Math.random() * 1_000_000_000);
+let statTick = 0;
+
 const makeStat = (type, size = 0) => {
-    const now = Date.now(); // always "changed", so git re-hashes content instead of trusting stale stats
+    const mtimeMs = (statBase + statTick++) * 1000;
     return {
         type, size, ino: 0, uid: 1, gid: 1, dev: 1,
         mode: type === 'dir' ? 0o40000 : 0o100644,
-        mtimeMs: now, ctimeMs: now,
+        mtimeMs, ctimeMs: mtimeMs,
         isFile: () => type === 'file',
         isDirectory: () => type === 'dir',
         isSymbolicLink: () => false,
