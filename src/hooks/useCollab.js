@@ -10,7 +10,7 @@ import { initProject, readNodes } from '../utils/fs';
 const readUsers = (awareness) =>
     [...awareness.getStates()]
         .filter(([, state]) => state.user)
-        .map(([clientId, state]) => ({ clientId, name: state.user.name, color: state.user.color, file: state.file || null }));
+        .map(([clientId, state]) => ({ clientId, name: state.user.name, color: state.user.color, file: state.file || null, typing: !!state.typing }));
 
 /**
  * Joins a room: one Yjs doc synced over a single WebSocket. The doc carries the project's
@@ -23,6 +23,7 @@ export default function useCollab(roomId, username) {
     const [nodes, setNodes] = useState([]);
     const [ready, setReady] = useState(false);
     const [run, setRunState] = useState({});
+    const [messages, setMessages] = useState([]);
 
     useEffect(() => {
         const doc = new Y.Doc();
@@ -32,6 +33,7 @@ export default function useCollab(roomId, username) {
         const gitfs = doc.getMap('gitfs'); // the repository's .git contents, shared by the room
         const meta = doc.getMap('meta');
         const runMap = doc.getMap('run');
+        const chat = doc.getArray('chat'); // messages, in the order everyone agrees on
         const color = colorFor(username);
         awareness.setLocalStateField('user', { name: username, color, colorLight: `${color}33` });
 
@@ -63,12 +65,15 @@ export default function useCollab(roomId, username) {
             if (events.some((e) => !(e.target instanceof Y.Text))) setNodes(readNodes(files));
         };
         const onRun = () => setRunState(runMap.toJSON());
+        const onChat = () => setMessages(chat.toArray());
         files.observeDeep(onFiles);
         runMap.observe(onRun);
+        chat.observe(onChat);
+        onChat();
         setNodes(readNodes(files));
         onRun();
 
-        setSession({ files, gitfs, awareness, runMap });
+        setSession({ files, gitfs, awareness, runMap, chat });
         return () => {
             awareness.off('change', onChange);
             provider.destroy();
@@ -76,6 +81,7 @@ export default function useCollab(roomId, username) {
             setSession(null);
             setReady(false);
             setNodes([]);
+            setMessages([]);
         };
     }, [roomId, username]);
 
@@ -88,5 +94,5 @@ export default function useCollab(roomId, username) {
         });
     }, [session]);
 
-    return { ...session, status, users, nodes, ready, run, publishRun };
+    return { ...session, status, users, nodes, ready, run, publishRun, messages };
 }

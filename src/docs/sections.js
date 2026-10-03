@@ -16,10 +16,11 @@ export const SECTIONS = [
                     <li><b>Files and folders</b> — use the Files panel on the left. Create, rename (double-click or F2), delete, drag to move, or drop files and whole folders from your computer to import them.</li>
                     <li><b>Run code</b> — pick JavaScript or Python and press <K>Run</K> (or <K>⌘</K>/<K>Ctrl</K> + <K>Enter</K>). The output is shared with the room.</li>
                     <li><b>Preview</b> — HTML and Markdown files get a live preview. HTML files pull in the <C>.css</C> and <C>.js</C> files they reference.</li>
+                    <li><b>Chat</b> — the speech-bubble button in the top bar opens a chat panel on the right. <K>Enter</K> sends, <K>Shift</K>+<K>Enter</K> adds a new line, and you can share code with triple backticks (<C>```</C>) or <C>`inline code`</C>. A red badge counts messages you haven’t read yet.</li>
                     <li><b>Terminal</b> — the <K>Terminal</K> tab at the bottom is a shell for your project, with git. See the next sections.</li>
                 </ul>
                 <Note title="What is shared, and what isn’t">
-                    Files, the git history, and the latest run output are shared with everyone in the room. Your terminal screen, command history and any access token you save are private to your browser.
+                    Files, the git history, the latest run output and the chat are shared with everyone in the room, and they are saved with the room — the chat history is still there when people come back (the most recent 500 messages are kept). Your terminal screen, command history and any access token you save are private to your browser.
                 </Note>
             </>
         ),

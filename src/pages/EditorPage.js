@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiPlay, FiLink, FiLogOut, FiFilePlus, FiHelpCircle } from 'react-icons/fi';
+import { FiPlay, FiLink, FiLogOut, FiFilePlus, FiHelpCircle, FiMessageSquare } from 'react-icons/fi';
 import Editor from './Editor';
 import Avatars from '../components/Avatars';
 import Explorer from '../components/Explorer';
@@ -9,6 +9,9 @@ import Tabs from '../components/Tabs';
 import { ConsoleBody, consoleChrome, Dock, PreviewBody } from '../components/OutputPanel';
 import TerminalPanel from '../components/TerminalPanel';
 import { DocsDialog } from '../components/Docs';
+import ChatPanel from '../components/ChatPanel';
+import { sendMessage, userId } from '../utils/chat';
+import { colorFor } from '../utils/colors';
 import useCollab from '../hooks/useCollab';
 import { LANGUAGES, detectLanguage, getLanguage } from '../languages';
 import { importIntoProject } from '../utils/importFiles';
@@ -28,13 +31,18 @@ function EditorPage() {
 
 function Room({ groupId, username }) {
   const navigate = useNavigate();
-  const { files, gitfs, awareness, users, nodes, ready, status, run, publishRun } = useCollab(groupId, username);
+  const { files, gitfs, awareness, users, nodes, ready, status, run, publishRun, chat, messages } = useCollab(groupId, username);
   const [localStatus, setLocalStatus] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const [panel, setPanel] = useState('main'); // 'main' = Output or Preview, or 'terminal'
   const [terminalOpened, setTerminalOpened] = useState(false);
   const [dockHeight, setDockHeight] = useState(0);
   const [docs, setDocs] = useState(null); // section id while the guide is open
+  const [chatOpen, setChatOpen] = useState(() => {
+    try { return localStorage.getItem('cwf:chat') === '1' && window.matchMedia('(min-width: 1101px)').matches; } catch { return false; }
+  });
+  const [seen, setSeen] = useState(null); // how many messages this person has already read
+  const myUid = useMemo(userId, []);
   const [openIds, setOpenIds] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(() => window.matchMedia('(min-width: 901px)').matches);
@@ -65,6 +73,23 @@ function Room({ groupId, username }) {
   }, [nodes, ready, nodeById, openIds, activeId]);
 
   useEffect(() => { awareness?.setLocalStateField('file', activeId); }, [awareness, activeId]);
+
+  // History that was already there when you joined counts as read; only newer messages are "unread".
+  useEffect(() => {
+    if (!ready) return;
+    if (seen === null || chatOpen) setSeen(messages.length);
+  }, [ready, messages.length, chatOpen, seen]);
+
+  const unread = !chatOpen && seen !== null ? messages.slice(Math.min(seen, messages.length)).filter((m) => m.uid !== myUid).length : 0;
+  const typingNames = users.filter((u) => u.typing && u.clientId !== awareness?.clientID).map((u) => u.name);
+
+  const toggleChat = (open) => {
+    setChatOpen(open);
+    try { localStorage.setItem('cwf:chat', open ? '1' : '0'); } catch { /* storage unavailable */ }
+    if (open && !window.matchMedia('(min-width: 901px)').matches) setExplorerOpen(false);
+  };
+
+  const postMessage = (text) => sendMessage(chat, { uid: myUid, user: username, color: colorFor(username), text });
 
   const active = nodeById.get(activeId);
   const ytext = active && files?.get(activeId)?.get('text');
@@ -170,6 +195,11 @@ function Room({ groupId, username }) {
           </button>
         )}
 
+        <button className="btn ghost chatBtn" onClick={() => toggleChat(!chatOpen)} aria-label={`Chat${unread ? `, ${unread} unread` : ''}`} aria-pressed={chatOpen} title="Chat">
+          <FiMessageSquare />
+          {unread > 0 && <span className="badge">{unread > 9 ? '9+' : unread}</span>}
+        </button>
+
         <button className="btn ghost helpBtn" onClick={() => setDocs('start')} aria-label="Open the guide" title="Guide">
           <FiHelpCircle />
         </button>
@@ -259,6 +289,17 @@ function Room({ groupId, username }) {
             );
           })()}
         </div>
+
+        {chatOpen && <div className="scrim chatScrim" onClick={() => toggleChat(false)} />}
+        <ChatPanel
+          open={chatOpen}
+          messages={messages}
+          myUid={myUid}
+          typingNames={typingNames}
+          onSend={postMessage}
+          onTyping={(typing) => awareness?.setLocalStateField('typing', typing)}
+          onClose={() => toggleChat(false)}
+        />
       </main>
       {docs && <DocsDialog section={docs} onSection={setDocs} onClose={() => setDocs(null)} />}
     </div>
