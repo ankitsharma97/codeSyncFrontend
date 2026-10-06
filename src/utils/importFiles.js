@@ -1,8 +1,10 @@
 // Bringing files from the user's computer into the shared project: reading dropped folders,
 // filtering out what doesn't belong in a code room, and creating the files and folders.
 import { createNode, MAX_DEPTH, MAX_ENTRIES } from './fs';
+import { extractPdfText, isPdf } from './pdfText';
 
 export const MAX_FILE_BYTES = 500 * 1024;
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 3 * 1024 * 1024;
 const MAX_SCANNED = 2000; // stop walking enormous folders
 
@@ -100,20 +102,30 @@ export async function importIntoProject(files, nodes, parent, items) {
 
     for (const { path, file } of items.sort((a, b) => a.path.localeCompare(b.path))) {
         const segments = path.split('/');
-        const name = segments.pop();
-        if (file.size > MAX_FILE_BYTES) { skipped.push({ path, reason: 'too large' }); continue; }
-        if (total + file.size > MAX_TOTAL_BYTES) { skipped.push({ path, reason: 'import size limit' }); continue; }
+        let name = segments.pop();
+        const pdf = isPdf(file);
+        // A PDF is limited by the text we get out of it, not by its own (often much larger) size.
+        let text = null;
+        if (pdf) {
+            if (file.size > MAX_PDF_BYTES) { skipped.push({ path, reason: 'too large' }); continue; }
+            try { text = await extractPdfText(file); } catch { skipped.push({ path, reason: 'unreadable PDF' }); continue; }
+            if (!text) { skipped.push({ path, reason: 'PDF has no text (scanned?)' }); continue; }
+            name += '.txt';
+        }
+        const size = pdf ? new Blob([text]).size : file.size;
+        if (size > MAX_FILE_BYTES) { skipped.push({ path, reason: 'too large' }); continue; }
+        if (total + size > MAX_TOTAL_BYTES) { skipped.push({ path, reason: 'import size limit' }); continue; }
         if (local.length >= MAX_ENTRIES) { skipped.push({ path, reason: 'project is full' }); continue; }
         if (segments.length >= MAX_DEPTH) { skipped.push({ path, reason: 'too deeply nested' }); continue; }
-        if (await looksBinary(file)) { skipped.push({ path, reason: 'not a text file' }); continue; }
+        if (!pdf && await looksBinary(file)) { skipped.push({ path, reason: 'not a text file' }); continue; }
 
         const folder = folderFor(segments);
         if (folder.error) { skipped.push({ path, reason: folder.error }); continue; }
         const finalName = uniqueName(childrenOf(folder.id).map((n) => n.name), name);
-        const made = createNode(files, local, { kind: 'file', name: finalName, parent: folder.id, text: await file.text() });
+        const made = createNode(files, local, { kind: 'file', name: finalName, parent: folder.id, text: pdf ? text : await file.text() });
         if (made.error) { skipped.push({ path, reason: made.error }); continue; }
         local.push({ id: made.id, name: finalName, parent: folder.id, kind: 'file', lang: null });
-        total += file.size;
+        total += size;
         summary.imported += 1;
         // Open something worth reading first, not a dotfile like .gitignore.
         if (!summary.firstId || (summary.firstIsDot && !finalName.startsWith('.'))) {
