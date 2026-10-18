@@ -32,6 +32,6 @@ export const detectLanguage = (filename) => BY_EXTENSION[filename.split('.').pop
 const BADGES = {
     javascript: ['JS', '#f1e05a'], typescript: ['TS', '#3b9cff'], python: ['PY', '#4ec27b'],
     java: ['JV', '#e9764b'], cpp: ['C++', '#c678dd'], html: ['<>', '#f08a4b'], css: ['#', '#a78bfa'],
-    json: ['{}', '#9aa4b2'], sql: ['SQ', '#38bdf8'], markdown: ['MD', '#19c6f0'], text: ['TX', '#8d92ad'],
+    json: ['{}', '#9aa4b2'], sql: ['SQ', '#38bdf8'], markdown: ['MD', '#19c6f0'], text: ['TX', '#8d92ad'], pdf: ['PDF', '#ff6e6e'],
 };
 export const badgeFor = (languageId) => BADGES[languageId] || BADGES.text;

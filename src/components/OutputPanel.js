@@ -144,9 +144,41 @@ export function PreviewBody({ ytext, files, language, entryPath, readFile }) {
         return () => { stale = true; clearTimeout(timer); ytext.unobserve(schedule); files.unobserveDeep(schedule); };
     }, [ytext, files, language, entryPath]);
 
-    // Opaque origin, isolated from the app. Markdown is also sanitized and gets no scripts at all.
-    const sandbox = language === 'markdown' ? 'allow-popups allow-popups-to-escape-sandbox' : 'allow-scripts';
+    const frame = useRef(null);
+    const [fitHeight, setFitHeight] = useState(null);
+    const markdown = language === 'markdown';
+
+    // Some mobile browsers won't scroll inside an iframe. Markdown has no scripts, so the frame can
+    // be sized to its content and the wrapper around it scrolls instead (touch scrolling then works).
+    useEffect(() => {
+        if (!markdown) return undefined;
+        const el = frame.current;
+        let observer;
+        const fit = () => {
+            const body = el?.contentDocument?.body;
+            if (!body) return;
+            setFitHeight(Math.ceil(body.getBoundingClientRect().height));
+            observer?.disconnect();
+            observer = new ResizeObserver(() => setFitHeight(Math.ceil(body.getBoundingClientRect().height)));
+            observer.observe(body);
+        };
+        el?.addEventListener('load', fit);
+        fit();
+        return () => { el?.removeEventListener('load', fit); observer?.disconnect(); };
+    }, [markdown, doc]);
+
+    // Opaque origin, isolated from the app. Markdown is also sanitized and gets no scripts at all
+    // (same-origin is only added there, so the app can measure the frame; nothing in it can run code).
+    const sandbox = markdown ? 'allow-same-origin allow-popups allow-popups-to-escape-sandbox' : 'allow-scripts';
+    const pending = doc == null ? 'pending' : '';
 
     // Until the first render lands, show the dock's own colour rather than a white flash.
-    return <iframe className={`preview ${doc == null ? 'pending' : ''}`} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />;
+    if (markdown) {
+        return (
+            <div className="previewScroll">
+                <iframe ref={frame} className={`preview fit ${pending}`} style={fitHeight ? { height: fitHeight } : undefined} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />
+            </div>
+        );
+    }
+    return <iframe className={`preview ${pending}`} title="Preview" sandbox={sandbox} srcDoc={doc ?? ''} />;
 }

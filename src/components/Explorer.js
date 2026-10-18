@@ -41,8 +41,8 @@ function NameInput({ initial = '', onSubmit, onCancel }) {
     );
 }
 
-function FileBadge({ name }) {
-    const [label, color] = badgeFor(detectLanguage(name));
+function FileBadge({ name, binary }) {
+    const [label, color] = badgeFor(binary ? 'pdf' : detectLanguage(name));
     return <span className="fileBadge" style={{ color }}>{label}</span>;
 }
 
@@ -187,7 +187,7 @@ function Explorer({ nodes, activeId, users, selfClientId, actions, onOpen, hasGi
                         }}
                     >
                         <span className={`chev ${isFolder && open ? 'open' : ''}`}>{isFolder && <FiChevronRight />}</span>
-                        {isFolder ? <FiFolder className="folderIcon" /> : <FileBadge name={node.name} />}
+                        {isFolder ? <FiFolder className="folderIcon" /> : <FileBadge name={node.name} binary={node.binary} />}
                         {renaming
                             ? <NameInput initial={node.name} onSubmit={submitRename} onCancel={() => setEditing(null)} />
                             : <span className="treeName">{node.name}</span>}

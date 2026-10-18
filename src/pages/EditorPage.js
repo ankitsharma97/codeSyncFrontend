@@ -10,6 +10,7 @@ import { ConsoleBody, consoleChrome, Dock, PreviewBody } from '../components/Out
 import TerminalPanel from '../components/TerminalPanel';
 import { DocsDialog } from '../components/Docs';
 import ChatPanel from '../components/ChatPanel';
+import PdfViewer from '../components/PdfViewer';
 import { sendMessage, userId } from '../utils/chat';
 import { buildZip, saveFile } from '../utils/exportZip';
 import { colorFor } from '../utils/colors';
@@ -108,7 +109,8 @@ function Room({ groupId, username }) {
   const postMessage = (text) => sendMessage(chat, { uid: myUid, user: username, color: colorFor(username), text });
 
   const active = nodeById.get(activeId);
-  const ytext = active && files?.get(activeId)?.get('text');
+  const entry = active && files?.get(activeId);
+  const ytext = entry && !active.binary ? entry.get('text') : null;
   const language = active ? (active.lang || detectLanguage(active.name)) : 'text';
   const lang = getLanguage(language);
   const entryPath = active ? paths[active.id] : '';
@@ -116,7 +118,7 @@ function Room({ groupId, username }) {
 
   const readFile = (path) => {
     const id = pathToId.get(path);
-    return id ? files.get(id).get('text').toString() : null;
+    return id && !nodeById.get(id).binary ? files.get(id).get('text').toString() : null;
   };
 
   const openFile = (id) => {
@@ -156,7 +158,7 @@ function Room({ groupId, username }) {
     setPanel('main');
     publishRun({ status: 'running', by: username, lang: language, at: Date.now() });
     const project = {};
-    pathToId.forEach((id, path) => { project[path] = files.get(id).get('text').toString(); });
+    pathToId.forEach((id, path) => { if (!nodeById.get(id).binary) project[path] = files.get(id).get('text').toString(); });
     const result = await runCode(language, ytext.toString(), { files: project, entry: entryPath, onStatus: setLocalStatus });
     setLocalStatus(null);
     publishRun({ status: 'done', by: username, lang: language, file: entryPath, at: Date.now(), ...result });
@@ -194,7 +196,7 @@ function Room({ groupId, username }) {
           className="select"
           value={language}
           onChange={(e) => setLanguage(files, activeId, e.target.value)}
-          disabled={!active}
+          disabled={!active || active.binary}
           aria-label="Language"
         >
           {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
@@ -252,7 +254,9 @@ function Room({ groupId, username }) {
 
           <div className="editorWrap">
             {status === 'disconnected' && <div className="banner">Connection lost — reconnecting. Your edits are kept and will sync.</div>}
-            {ytext
+            {active?.binary
+              ? <PdfViewer key={activeId} entry={entry} name={active.name} />
+              : ytext
               ? <Editor ytext={ytext} awareness={awareness} language={language} onRun={handleRun} />
               : (
                 <div className="emptyState">

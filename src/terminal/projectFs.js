@@ -3,7 +3,7 @@
 //   - Working-tree paths map onto the project's file tree (Yjs `files` map).
 //   - Anything under a `.git` directory lives in a separate Yjs map (`gitfs`), keyed by absolute
 //     path, so the repository history is shared by the room but never shows up in the explorer.
-import { createNode, deleteNode, pathsById, readNodes, validateName } from '../utils/fs';
+import { createNode, deleteNode, pathsById, readBinary, readNodes, validateName } from '../utils/fs';
 
 export const MAX_GIT_FILE_BYTES = 1.5 * 1024 * 1024; // keeps each sync message under the server's cap
 export const MAX_GIT_TOTAL_BYTES = 12 * 1024 * 1024;
@@ -92,6 +92,13 @@ export class ProjectFs {
 
     _text(node) { return this.files.get(node.id).get('text'); }
 
+    // Bytes of a binary file (a PDF); not yet fully synced counts as missing.
+    _binary(node) {
+        const bytes = readBinary(this.files.get(node.id));
+        if (!bytes) throw fail('EIO', node.name, 'file is still syncing');
+        return bytes;
+    }
+
     _children(folderPath) {
         const id = folderPath === '/' ? null : this.index.byPath.get(folderPath.slice(1))?.id;
         if (folderPath !== '/' && !id) return [];
@@ -142,7 +149,7 @@ export class ProjectFs {
             const node = this._node(p);
             if (!node) throw fail('ENOENT', p, 'no such file or directory');
             if (node.kind === 'folder') throw fail('EISDIR', p, 'illegal operation on a directory');
-            bytes = encoder.encode(this._text(node).toString());
+            bytes = node.binary ? this._binary(node) : encoder.encode(this._text(node).toString());
         }
         return encoding ? decoder.decode(bytes) : bytes;
     }
@@ -156,9 +163,14 @@ export class ProjectFs {
             this.gitfs.set(p, new Uint8Array(bytes));
             return;
         }
-        const text = typeof data === 'string' ? data : decoder.decode(bytes);
         const node = this._node(p);
         if (node?.kind === 'folder') throw fail('EISDIR', p, 'illegal operation on a directory');
+        if (node?.binary) { // PDFs can be read and committed, but not rewritten from the terminal
+            const current = this._binary(node);
+            if (current.length === bytes.length && current.every((b, i) => b === bytes[i])) return;
+            throw fail('EPERM', p, 'binary files cannot be modified from the terminal');
+        }
+        const text = typeof data === 'string' ? data : decoder.decode(bytes);
         if (node) replaceText(this._text(node), text); else this._create('file', p, text);
     }
 
@@ -227,7 +239,7 @@ export class ProjectFs {
         const node = this._node(p);
         if (!node) throw fail('ENOENT', p, 'no such file or directory');
         if (node.kind === 'folder') return makeStat('dir');
-        return makeStat('file', encoder.encode(this._text(node).toString()).length);
+        return makeStat('file', node.binary ? node.size : encoder.encode(this._text(node).toString()).length);
     }
 
     lstat(path) { return this.stat(path); }
@@ -291,7 +303,7 @@ export class ProjectFs {
     // every file in the working tree: { "src/app.py": "text" }
     snapshot() {
         const out = {};
-        this.index.byPath.forEach((node, path) => { if (node.kind === 'file') out[path] = this._text(node).toString(); });
+        this.index.byPath.forEach((node, path) => { if (node.kind === 'file' && !node.binary) out[path] = this._text(node).toString(); });
         return out;
     }
 

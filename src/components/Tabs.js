@@ -9,7 +9,7 @@ function Tabs({ tabs, activeId, onSelect, onClose, onToggleExplorer, explorerOpe
                 <FiSidebar />
             </button>
             {tabs.map((tab) => {
-                const [label, color] = badgeFor(tab.lang || detectLanguage(tab.name));
+                const [label, color] = badgeFor(tab.binary ? 'pdf' : tab.lang || detectLanguage(tab.name));
                 return (
                     <div
                         key={tab.id}

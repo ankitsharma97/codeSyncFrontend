@@ -1,5 +1,5 @@
 // Export the shared project as a .zip, built entirely in the browser (nothing is uploaded).
-import { pathsById, readNodes } from './fs';
+import { pathsById, readBinary, readNodes } from './fs';
 
 const EMPTY = new Uint8Array(0);
 
@@ -21,7 +21,10 @@ export async function buildZip({ files, gitfs, root, includeGit }) {
         if (n.kind === 'folder') {
             entries[`${path}/`] = [EMPTY, { level: 0, mtime }];
         } else {
-            entries[path] = [strToU8(files.get(n.id).get('text').toString()), { level: 6, mtime }];
+            const entry = files.get(n.id);
+            const bytes = n.binary ? readBinary(entry) : null;
+            if (n.binary && !bytes) return; // still arriving from another client
+            entries[path] = n.binary ? [bytes, { level: 0, mtime }] : [strToU8(entry.get('text').toString()), { level: 6, mtime }];
             fileCount += 1;
         }
     });

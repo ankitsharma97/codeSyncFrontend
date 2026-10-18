@@ -7,6 +7,7 @@ import { getLanguage } from '../languages';
 
 export const MAX_ENTRIES = 100;
 export const MAX_DEPTH = 6;
+export const CHUNK_BYTES = 512 * 1024; // each chunk is its own sync message; the server caps a message at 2 MB
 
 export const readNodes = (files) => {
     const nodes = [];
@@ -16,6 +17,9 @@ export const readNodes = (files) => {
         parent: entry.get('parent') || null,
         kind: entry.get('kind') || 'file',
         lang: entry.get('lang') || null,
+        binary: !!entry.get('binary'),
+        size: entry.get('size') || 0,
+        mime: entry.get('mime') || null,
     }));
     return nodes;
 };
@@ -98,7 +102,19 @@ export const validateName = (nodes, parent, name, selfId = null) => {
     return clash ? `“${name}” already exists here` : null;
 };
 
-export const createNode = (files, nodes, { kind, name, parent = null, text = '' }) => {
+// A binary file (a PDF) is stored as { binary, mime, size, chunks: Y.Array<Uint8Array> } instead of text.
+// The bytes are only complete once the chunks add up to `size`; readBinary returns null until then.
+export const readBinary = (entry) => {
+    const size = entry?.get('size') || 0;
+    const chunks = entry?.get('chunks')?.toArray() || [];
+    if (!entry?.get('binary') || chunks.reduce((n, c) => n + c.length, 0) !== size) return null;
+    const out = new Uint8Array(size);
+    let at = 0;
+    chunks.forEach((c) => { out.set(c, at); at += c.length; });
+    return out;
+};
+
+export const createNode = (files, nodes, { kind, name, parent = null, text = '', bytes = null, mime = null }) => {
     const error = validateName(nodes, parent, name)
         || (nodes.length >= MAX_ENTRIES && `A project can hold at most ${MAX_ENTRIES} files and folders`)
         || (parent && depthOf(nodes, parent) >= MAX_DEPTH && `Folders can nest at most ${MAX_DEPTH} levels deep`);
@@ -110,8 +126,21 @@ export const createNode = (files, nodes, { kind, name, parent = null, text = '' 
         entry.set('name', name);
         entry.set('parent', parent);
         entry.set('kind', kind);
-        if (kind === 'file') entry.set('text', new Y.Text(text));
+        if (kind === 'file' && bytes) {
+            entry.set('binary', true);
+            entry.set('mime', mime);
+            entry.set('size', bytes.length);
+            entry.set('chunks', new Y.Array());
+        } else if (kind === 'file') {
+            entry.set('text', new Y.Text(text));
+        }
     });
+    if (bytes) {
+        const chunks = files.get(id).get('chunks');
+        for (let at = 0; at < bytes.length; at += CHUNK_BYTES) {
+            chunks.push([bytes.slice(at, at + CHUNK_BYTES)]); // one transaction (and sync message) per chunk
+        }
+    }
     return { id };
 };
 
